@@ -3,7 +3,6 @@
 import pandas as pd
 import numpy as np
 import seaborn as sns
-#https://towardsdatascience.com/implementing-a-decision-tree-from-scratch-f5358ff9c4bb
 
 from sklearn import datasets
 
@@ -44,10 +43,10 @@ class DecisionTreeModel:
         # end TODO
         pass
         
-    def _fit(self, X, y):
+    def _fit(self, X: pd.DataFrame, y: pd.Series):
         self.root = self._build_tree(X, y)
         
-    def _predict(self, X):
+    def _predict(self, X: pd.DataFrame):
         predictions = [self._traverse_tree(x, self.root) for x in X]
         return np.array(predictions)    
         
@@ -67,9 +66,12 @@ class DecisionTreeModel:
         # end TODO
         return result
                               
-    def _build_tree(self, X, y, depth=0):
+    def _build_tree(self, X: pd.DataFrame, y: pd.Series, depth=0):
         self.n_samples, self.n_features = X.shape
         self.n_class_labels = len(np.unique(y))
+
+        # Check if this series has any none integer value (categorical values)
+        y = self._change_if_categorical(y)
 
         # stopping criteria
         if self._is_finished(depth):
@@ -85,43 +87,87 @@ class DecisionTreeModel:
         left_child = self._build_tree(X[left_idx, :], y[left_idx], depth + 1)
         right_child = self._build_tree(X[right_idx, :], y[right_idx], depth + 1)
         return Node(best_feat, best_thresh, left_child, right_child)
-    
 
-    def _gini(self, y):
-        #TODO
-        gini = 0
-        #end TODO
+    def _change_if_categorical(self, y: pd.Series):
+        if self._is_categorical(y):
+            # If so, get the unique classes of that feature
+            classes_label = np.unique(y)
+            # Iterate through all the unique classes and apply to each value to check
+            for i in range(0, len(classes_label)):
+                # If its the current class label, if so we give it the index of the class label as a numerical value
+                y = y.apply(lambda x: i if x == classes_label[i] else None)
+        return y
+    
+    def _is_categorical(self, y: pd.Series) -> bool:
+        """
+        Loops through the `y` series and if it hits any value that its not an integer then it will
+        return `True` as in that series is categorical, otherwise it will return `False` once it 
+        loops through all the values of `y` and all values were `int`.
+
+        **Assuming the values are not `int` that in `str` form** Otherwise it will consider them as categorical.
+        """
+        for _, val in y.iteritems():
+            if type(val) != int:
+                return True
+        return False
+
+    def _gini(self, y:pd.Series):
+        """
+        Calculates the `gini` metric.
+        It checks if the series is categorical or not, if it is then it will change the values of
+        the series into numerical values from 0-n where `n` is the number of classes that feature has.
+        """
+        proportions = np.bincount(y) / len(y)
+        gini = np.sum([p * (1 - p) for p in proportions if p > 0])
         return gini
     
-    def _entropy(self, y):
-        # TODO: the following won't work if y is not integer
-        # make it work for the cases where y is a categorical variable
+    def _entropy(self, y: pd.Series):
+        """
+        Calculates the `entropy` of the split.
+        It checks if the series is categorical or not, if it is then it will change the values of
+        the series into numerical values from 0-n where `n` is the number of classes that feature has.
+        """       
+        # Check if this series has any none integer value (categorical values)
+        if self._is_categorical(y):
+            # If so, get the unique classes of that feature
+            classes_label = np.unique(y)
+            # Iterate through all the unique classes and apply to each value to check
+            for i in range(0, len(classes_label)):
+                # If its the current class label, if so we give it the index of the class label as a numerical value
+                y = y.apply(lambda x: i if x == classes_label[i] else None)
+        
+        # change the data to be 0 to n unque values of y
         proportions = np.bincount(y) / len(y)
         entropy = -np.sum([p * np.log2(p) for p in proportions if p > 0])
 
-        # end TODO
         return entropy
         
-    def _create_split(self, X, thresh):
+    def _create_split(self, X: pd.DataFrame, thresh):
         left_idx = np.argwhere(X <= thresh).flatten()
         right_idx = np.argwhere(X > thresh).flatten()
         return left_idx, right_idx
 
-    def _information_gain(self, X, y, thresh):
-        # TODO: fix the code so it can switch between the two criterion: gini and entropy 
-        
-        parent_loss = self._entropy(y)
+    def _call_entropy_or_gini(self, y: pd.Series):
+        """
+        It will return either `self._entropy(y)` or `self._gini(y)` based on what the `criterion` is.
+        """
+        return self._entropy(y) if self.criterion == 'entropy' else self._gini(y)
+
+    def _information_gain(self, X: pd.DataFrame, y: pd.Series, thresh):
+        # It will get the either entropy of gini based on the criterion 
+        parent_loss = self._call_entropy_or_gini(y)
+
         left_idx, right_idx = self._create_split(X, thresh)
         n, n_left, n_right = len(y), len(left_idx), len(right_idx)
 
         if n_left == 0 or n_right == 0: 
             return 0
         
-        child_loss = (n_left / n) * self._entropy(y[left_idx]) + (n_right / n) * self._entropy(y[right_idx])
-        # end TODO
+        child_loss = (n_left / n) * self._call_entropy_or_gini(y[left_idx]) + (n_right / n) * self._call_entropy_or_gini(y[right_idx])
+
         return parent_loss - child_loss
        
-    def _best_split(self, X, y, features):
+    def _best_split(self, X: pd.DataFrame, y: pd.Series, features):
         '''TODO: add comments here
 
         '''
