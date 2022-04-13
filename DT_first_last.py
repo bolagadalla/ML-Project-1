@@ -216,20 +216,80 @@ def accuracy_score(y_true, y_pred):
     accuracy = np.sum(y_true == y_pred) / len(y_true)
     return accuracy
 
+def _count_occurence(y_pred):
+    '''
+    It counts the occurence of `0` and `1` in the predicted array and return it as a `splitted list`
+    '''
+    one, zero = 0, 0
+    
+    for i in y_pred:
+        if i == 1:
+            one += 1
+        else:
+            zero += 1
+    
+    return zero, one
+
 def classification_report(y_test, y_pred):
+    '''
+    It will calculate precision, recall, f1-score, support, accuracy, macro avg, and weighted avg
+    and then display it into a matrix form.
+    '''
     # calculate precision, recall, f1-score
-    # TODO:
-    result = 'To be implemented'
-    # end TODO
-    return(result)
+    top, bottom = confusion_matrix(y_test, y_pred)
+    tp, fn = top
+    fp, tn = bottom
 
-def confusion_matrix(y_test, y_pred):
+    precision0 = (tn / (tn + fn))
+    precision1 = (tp / (tp + fp))
+
+    recall0 = (tn / (tn + fp))
+    recall1 = (tp / (tp + fn))
+
+    f1_score0 = 2 * (recall0 * precision0) / (recall0 + precision0)
+    f1_score1 = 2 * (recall1 * precision1) / (recall1 + precision1)
+
+    support0, support1 = _count_occurence(y_pred)
+
+    result = f'''                    precision    recall    f1-score    support
+    0               {"%.2f" % round(precision0, 2)}        {"%.2f" % round(recall0, 2)}        {"%.2f" % round(f1_score0, 2)}        {support0}
+    1               {"%.2f" % round(precision1, 2)}        {"%.2f" % round(recall1, 2)}        {"%.2f" % round(f1_score1, 2)}        {support1}
+    accuracy                                {"%.2f" % round(accuracy_score(y_test, y_pred), 2)}        {support0 + support1}
+    macro avg       {"%.2f" % round((precision0 + precision1) / 2, 2)}        {"%.2f" % round((recall0 + recall1) / 2, 2)}        {"%.2f" % round((f1_score0 + f1_score1) / 2, 2)}        {support0 + support1}
+    weighted avg    {"%.2f" % round(((precision0 * support0) + (precision1 * support1)) / (support0 + support1), 2)}        {"%.2f" % round(((recall0 * support0) + (recall1 * support1)) / (support0 + support1), 2)}        {"%.2f" % round(((f1_score0 * support0) + (f1_score1 * support1)) / (support0 + support1), 2)}        {support0 + support1}
+    '''
+    return result
+
+def confusion_matrix(y_test: pd.Series, y_pred: np.ndarray):
+    '''
+    It creates a confusion matrix where it shows you the true positive, false negative, false positive, and true negative
+
+    ## Returns
+    `2D array` which will looks like this:
+
+                      Predicted Value
+                        +---------+
+                        | tp | fn |
+            Actual Value|----|----|
+                        | fp | tn |
+                        +---------+
+    '''
     # return the 2x2 matrix
-    # TODO:
-    result = np.array([[0, 0], [0, 0]])
-    # end TODO
+    tp, fn, fp, tn = 0, 0, 0, 0
+    # loops through the prediction series
+    for i, val in y_test.reset_index(drop=True).iteritems():
+        # Compares the current value of the prediction to the y_test at this index
+        p_val = y_pred[i]
+        if val == 1 and p_val == 1:
+            tp += 1
+        elif val == 1 and p_val == 0:
+            fn += 1
+        elif val == 0 and p_val == 1:
+            fp += 1
+        else:
+            tn += 1
+    result = np.array([[tp, fn], [fp, tn]])
     return(result)
-
 
 def _test():
     
