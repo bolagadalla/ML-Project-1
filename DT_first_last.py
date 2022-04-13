@@ -1,10 +1,10 @@
 
 
+from collections import Counter
+import random
 import pandas as pd
 import numpy as np
 import seaborn as sns
-
-from sklearn import datasets
 
 from sklearn.model_selection import train_test_split
 
@@ -32,7 +32,7 @@ class DecisionTreeModel:
     def fit(self, X: pd.DataFrame, y: pd.Series):
         # Will change y to numpy array later on the code
         self._fit(X.to_numpy(), y) 
-        print("Done fitting")
+        # print("Done fitting")
 
     def predict(self, X: pd.DataFrame):
         return self._predict(X.to_numpy())
@@ -193,25 +193,32 @@ class DecisionTreeModel:
 
 class RandomForestModel(object):
 
-    def __init__(self, n_estimators):
-        # TODO:
-        pass
-        # end TODO
+    def __init__(self, n_estimators: int, max_depth=100, criterion = 'gini', min_samples_split=2, impurity_stopping_threshold = 1):
+        '''
+        '''
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.criterion = criterion
+        self.min_samples_split = min_samples_split
+        self.impurity_stopping_threshold = impurity_stopping_threshold
+        self.forest = []
 
     def fit(self, X: pd.DataFrame, y: pd.Series):
-        # TODO:
-        pass
-        # end TODO
-        pass
+        for i in range(0, self.n_estimators):
+            idxs = np.random.choice(len(y), replace=True, size=len(y)) 
+            tree = DecisionTreeModel(max_depth=random.randint(self.max_depth // 3, self.max_depth), criterion=self.criterion, min_samples_split=self.min_samples_split, impurity_stopping_threshold=self.impurity_stopping_threshold)
+            tree.fit(X.iloc[idxs], y.iloc[idxs])
+            self.forest.append(tree)
 
+    def _common_result(self, values:list):
+        return np.array([Counter(col).most_common(1)[0][0] for col in zip(*values)])
 
     def predict(self, X: pd.DataFrame):
-        # TODO:
-        pass
-        # end TODO
-
-    
-
+        tree_values = []
+        for tree in self.forest:
+            tree_values.append(tree.predict(X))
+        return self._common_result(tree_values)
+        
 def accuracy_score(y_true, y_pred):
     accuracy = np.sum(y_true == y_pred) / len(y_true)
     return accuracy
