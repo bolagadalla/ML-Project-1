@@ -30,25 +30,21 @@ class DecisionTreeModel:
         self.root = None
 
     def fit(self, X: pd.DataFrame, y: pd.Series):
-        # TODO
-        # call the _fit method
-        # 
-        # end TODO
+        # Will change y to numpy array later on the code
+        self._fit(X.to_numpy(), y) 
         print("Done fitting")
 
     def predict(self, X: pd.DataFrame):
-        # TODO
-        # call the predict method
-        # return ...
-        # end TODO
-        pass
+        return self._predict(X.to_numpy())
         
-    def _fit(self, X: pd.DataFrame, y: pd.Series):
+    def _fit(self, X: np.ndarray, y: pd.Series):
+        # Check if this series has any none integer value (categorical values)
+        y = self._change_if_categorical(y).to_numpy() # changes it into numpy array
         self.root = self._build_tree(X, y)
         
-    def _predict(self, X: pd.DataFrame):
+    def _predict(self, X: np.ndarray):
         predictions = [self._traverse_tree(x, self.root) for x in X]
-        return np.array(predictions)    
+        return np.array(predictions)
         
     def _is_finished(self, depth):
         # TODO: for graduate students only, add another stopping criteria
@@ -66,13 +62,10 @@ class DecisionTreeModel:
         # end TODO
         return result
                               
-    def _build_tree(self, X: pd.DataFrame, y: pd.Series, depth=0):
+    def _build_tree(self, X: np.ndarray, y: pd.Series, depth=0):
         self.n_samples, self.n_features = X.shape
         self.n_class_labels = len(np.unique(y))
-
-        # Check if this series has any none integer value (categorical values)
-        y = self._change_if_categorical(y)
-
+        
         # stopping criteria
         if self._is_finished(depth):
             most_common_Label = np.argmax(np.bincount(y))
@@ -117,6 +110,7 @@ class DecisionTreeModel:
         It checks if the series is categorical or not, if it is then it will change the values of
         the series into numerical values from 0-n where `n` is the number of classes that feature has.
         """
+        # The y will always be represented as numerical value since we changed it in `_build_tree()`
         proportions = np.bincount(y) / len(y)
         gini = np.sum([p * (1 - p) for p in proportions if p > 0])
         return gini
@@ -126,23 +120,14 @@ class DecisionTreeModel:
         Calculates the `entropy` of the split.
         It checks if the series is categorical or not, if it is then it will change the values of
         the series into numerical values from 0-n where `n` is the number of classes that feature has.
-        """       
-        # Check if this series has any none integer value (categorical values)
-        if self._is_categorical(y):
-            # If so, get the unique classes of that feature
-            classes_label = np.unique(y)
-            # Iterate through all the unique classes and apply to each value to check
-            for i in range(0, len(classes_label)):
-                # If its the current class label, if so we give it the index of the class label as a numerical value
-                y = y.apply(lambda x: i if x == classes_label[i] else None)
-        
-        # change the data to be 0 to n unque values of y
+        """               
+        # The y will always be represented as numerical value since we changed it in `_build_tree()`
         proportions = np.bincount(y) / len(y)
         entropy = -np.sum([p * np.log2(p) for p in proportions if p > 0])
 
         return entropy
         
-    def _create_split(self, X: pd.DataFrame, thresh):
+    def _create_split(self, X: np.ndarray, thresh):
         left_idx = np.argwhere(X <= thresh).flatten()
         right_idx = np.argwhere(X > thresh).flatten()
         return left_idx, right_idx
@@ -153,7 +138,7 @@ class DecisionTreeModel:
         """
         return self._entropy(y) if self.criterion == 'entropy' else self._gini(y)
 
-    def _information_gain(self, X: pd.DataFrame, y: pd.Series, thresh):
+    def _information_gain(self, X: np.ndarray, y: np.ndarray, thresh):
         # It will get the either entropy of gini based on the criterion 
         parent_loss = self._call_entropy_or_gini(y)
 
@@ -167,12 +152,17 @@ class DecisionTreeModel:
 
         return parent_loss - child_loss
        
-    def _best_split(self, X: pd.DataFrame, y: pd.Series, features):
-        '''TODO: add comments here
+    def _best_split(self, X: np.ndarray, y: np.ndarray, features):
+        '''
+        It will loop through all the features one by one. And at each feature it will get all the 
+        column of that feature and creates an array of all the unique values in that colnmn. Then, 
+        looping through each unique value and tries to calculate the information gain score if we 
+        split it at that point and storing it if the `score` was higher then the previous value score.
 
+        ## Returns:
+        split feature and split threshold as tuple
         '''
         split = {'score':- 1, 'feat': None, 'thresh': None}
-
         for feat in features:
             X_feat = X[:, feat]
             thresholds = np.unique(X_feat)
@@ -187,7 +177,11 @@ class DecisionTreeModel:
         return split['feat'], split['thresh']
     
     def _traverse_tree(self, x, node):
-        '''TODO: add some comments here
+        '''
+        It will triverse through the tree starting at the `root` node. Then it will check the current
+        value of `x` to see if its less then or equal to the node threshold. If it is, it will start
+        to triverse the left node. Otherwise, it will triverse the right node. It will do this until
+        it reaches a leaf node which will return the value of that last node.
         '''
         if node.is_leaf():
             return node.value
@@ -247,9 +241,7 @@ def _test():
     X = df.drop(['diagnosis'], axis=1)
     y = df['diagnosis'].apply(lambda x: 0 if x == 'M' else 1)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=1
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
 
     clf = DecisionTreeModel(max_depth=10)
     clf.fit(X_train, y_train)
