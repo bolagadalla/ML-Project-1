@@ -9,6 +9,9 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 
 class Node:
+    '''
+    Node class that would hold data for the Decision tree. Data like: `features`, `threshold`, `left` for left nodes, `right` for right nodes, `value` and the value at which it splits
+    '''
     def __init__(self, feature=None, threshold=None, left=None, right=None, *, value=None):
         self.feature = feature
         self.threshold = threshold
@@ -21,7 +24,15 @@ class Node:
     
 
 class DecisionTreeModel:
+    '''
+    Decision Tree Class which would build a model.
 
+    ## Input:
+    `max_depth` is the max height of the tree.
+    `criterion` is the type of criterion to measure the `information gain`.
+    `min_samples_split` how many splits are we going to perform
+    `impurity_stopping_threshold` for graduate students
+    '''
     def __init__(self, max_depth=100, criterion = 'gini', min_samples_split=2, impurity_stopping_threshold = 1):
         self.max_depth = max_depth
         self.criterion = criterion
@@ -35,6 +46,16 @@ class DecisionTreeModel:
         # print("Done fitting")
 
     def predict(self, X: pd.DataFrame):
+        '''
+        Takes in an `X` Dataframe and returns an array of prediction for each point.
+
+        ## Input:
+        `X` **Dataframe** type.
+
+        ## Return:
+        `np.ndarray` which will hold the predictions
+        '''
+        # Returns an array of predictions
         return self._predict(X.to_numpy())
         
     def _fit(self, X: np.ndarray, y: pd.Series):
@@ -43,6 +64,7 @@ class DecisionTreeModel:
         self.root = self._build_tree(X, y)
         
     def _predict(self, X: np.ndarray):
+        # Triverse the tree and return the values into an array
         predictions = [self._traverse_tree(x, self.root) for x in X]
         return np.array(predictions)
         
@@ -63,6 +85,10 @@ class DecisionTreeModel:
         return result
                               
     def _build_tree(self, X: np.ndarray, y: pd.Series, depth=0):
+        '''
+        Builds a Decision Tree by splitting the date at the point where its the best information gain using the inputted `criterion`.
+        '''
+
         self.n_samples, self.n_features = X.shape
         self.n_class_labels = len(np.unique(y))
         
@@ -82,6 +108,9 @@ class DecisionTreeModel:
         return Node(best_feat, best_thresh, left_child, right_child)
 
     def _change_if_categorical(self, y: pd.Series):
+        '''
+        Gets all the labesl of `y` and loops throught them and gives them an Ordinal Encoding from 0-n where `n` is the length of unique labels.
+        '''
         if self._is_categorical(y):
             # If so, get the unique classes of that feature
             classes_label = np.unique(y)
@@ -104,11 +133,10 @@ class DecisionTreeModel:
                 return True
         return False
 
-    def _gini(self, y:pd.Series):
+    def _gini(self, y:np.ndarray):
         """
         Calculates the `gini` metric.
-        It checks if the series is categorical or not, if it is then it will change the values of
-        the series into numerical values from 0-n where `n` is the number of classes that feature has.
+        It already changed values to numeric values if it was categorical input using Ordinal Encoding.
         """
         # The y will always be represented as numerical value since we changed it in `_build_tree()`
         proportions = np.bincount(y) / len(y)
@@ -128,8 +156,10 @@ class DecisionTreeModel:
         return entropy
         
     def _create_split(self, X: np.ndarray, thresh):
+        # Creates a split and assign the values where X is less then or equal tot the threshold to the left, and to the right the rest.
         left_idx = np.argwhere(X <= thresh).flatten()
         right_idx = np.argwhere(X > thresh).flatten()
+        # Returns the left and right indexes of the input `X`
         return left_idx, right_idx
 
     def _call_entropy_or_gini(self, y: pd.Series):
@@ -142,6 +172,7 @@ class DecisionTreeModel:
         # It will get the either entropy of gini based on the criterion 
         parent_loss = self._call_entropy_or_gini(y)
 
+        # Gets all the indexes of the data that would be dealt with on the left side of the tree and the right side of the tree
         left_idx, right_idx = self._create_split(X, thresh)
         n, n_left, n_right = len(y), len(left_idx), len(right_idx)
 
@@ -195,31 +226,52 @@ class RandomForestModel(object):
 
     def __init__(self, n_estimators: int, max_depth=100, criterion = 'gini', min_samples_split=2, impurity_stopping_threshold = 1):
         '''
+        It creates an array of Decision Trees passing in the required parameters that was also passed into this class. 
+        It will create `n_estimators` amount of trees, and for each tree when its *fitted* the input data is shuffled.
+
+        ## Input:
+        `n_estimators`: int - The amount of trees ot create 
+        `max_depth` = 100 - The max depth of each tree.
+        `criterion` = 'gini' - This is the criterion which will be used to split the data.
         '''
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.criterion = criterion
         self.min_samples_split = min_samples_split
         self.impurity_stopping_threshold = impurity_stopping_threshold
+        # The trees in the forest
         self.forest = []
 
     def fit(self, X: pd.DataFrame, y: pd.Series):
         for i in range(0, self.n_estimators):
+            # Shuffles the data
             idxs = np.random.choice(len(y), replace=True, size=len(y)) 
-            tree = DecisionTreeModel(max_depth=random.randint(self.max_depth // 3, self.max_depth), criterion=self.criterion, min_samples_split=self.min_samples_split, impurity_stopping_threshold=self.impurity_stopping_threshold)
+            # Creates a tree
+            tree = DecisionTreeModel(max_depth=self.max_depth, criterion=self.criterion, min_samples_split=self.min_samples_split, impurity_stopping_threshold=self.impurity_stopping_threshold)
+            # Fit the tree while passing in the shuffled indexes
             tree.fit(X.iloc[idxs], y.iloc[idxs])
+            # Append the tree to the array of `forests`
             self.forest.append(tree)
 
     def _common_result(self, values:list):
+        '''
+        It will look at each column of the `values` (since it will be a 2D array where each value of the array is the prediction of a tree in the forest)
+        and pick the most common, the prediction that is most predicted. Then return all the results as a 1D array.
+        '''
         return np.array([Counter(col).most_common(1)[0][0] for col in zip(*values)])
 
     def predict(self, X: pd.DataFrame):
+        '''
+        Will loop through each tree in the `forest` and call the `predict(X)` method on them, and return the result as its own array into another array.
+        This will be a result of 2D array where each value of the array is a prediction of a tree.
+        '''
         tree_values = []
         for tree in self.forest:
             tree_values.append(tree.predict(X))
         return self._common_result(tree_values)
         
 def accuracy_score(y_true, y_pred):
+    '''Calcualtes the accuracy score of a model using its `y_pred` values.'''
     accuracy = np.sum(y_true == y_pred) / len(y_true)
     return accuracy
 
